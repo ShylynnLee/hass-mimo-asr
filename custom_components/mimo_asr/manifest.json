@@ -1,9 +1,9 @@
 {
   "domain": "mimo_asr",
   "name": "小米 MIMO ASR",
-  "documentation": "https://github.com/yourusername/hass-mimo-asr",
+  "documentation": "https://github.com/ShylynnLee/hass-mimo-asr",
   "dependencies": [],
-  "codeowners": ["@yourusername"],
+  "codeowners": ["@ShylynnLee"],
   "config_flow": true,
   "integration_type": "service",
   "iot_class": "cloud_push",

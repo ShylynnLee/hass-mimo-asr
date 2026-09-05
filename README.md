@@ -17,7 +17,7 @@
 ### 通过 HACS 安装（推荐）
 
 1. 在 HACS 中添加自定义存储库：
-   - 存储库：`https://github.com/yourusername/hass-mimo-asr`
+   - 存储库：`https://github.com/ShylynnLee/hass-mimo-asr`
    - 类别：集成
 2. 搜索 "MIMO ASR" 并安装
 3. 重启 Home Assistant
