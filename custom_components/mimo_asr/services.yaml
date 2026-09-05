@@ -1,0 +1,21 @@
+transcribe_audio:
+  name: "Transcribe Audio"
+  description: "Transcribe audio file using MIMO ASR"
+  fields:
+    audio_file:
+      name: "Audio File"
+      description: "Path to audio file"
+      required: true
+      selector:
+        text:
+    language:
+      name: "Language"
+      description: "Language code (auto, zh, en)"
+      required: false
+      default: "zh"
+      selector:
+        select:
+          options:
+            - "auto"
+            - "zh"
+            - "en"

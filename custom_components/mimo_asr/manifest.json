@@ -1,0 +1,12 @@
+{
+  "domain": "mimo_asr",
+  "name": "小米 MIMO ASR",
+  "documentation": "https://github.com/yourusername/hass-mimo-asr",
+  "dependencies": [],
+  "codeowners": ["@yourusername"],
+  "config_flow": true,
+  "integration_type": "service",
+  "iot_class": "cloud_push",
+  "requirements": ["openai>=1.0.0"],
+  "version": "1.0.0"
+}
