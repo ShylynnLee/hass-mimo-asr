@@ -5,14 +5,9 @@ from typing import Any
 
 import openai
 from homeassistant.components.stt import (
-    AudioBitRates,
-    AudioChannels,
-    AudioCodecs,
-    AudioFormats,
-    AudioSampleRates,
     SpeechResult,
     SpeechResultState,
-    STTProvider,
+    SttProvider,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -25,7 +20,7 @@ async def async_get_engine(hass: HomeAssistant, config: ConfigEntry) -> "MimoAsr
     """Set up MIMO ASR speech-to-text."""
     return MimoAsrProvider(hass, config)
 
-class MimoAsrProvider(STTProvider):
+class MimoAsrProvider(SttProvider):
     """MIMO ASR speech-to-text provider."""
 
     def __init__(self, hass: HomeAssistant, config: ConfigEntry) -> None:
@@ -45,29 +40,29 @@ class MimoAsrProvider(STTProvider):
         return ["auto", "zh", "en"]
 
     @property
-    def supported_formats(self) -> list[AudioFormats]:
+    def supported_formats(self) -> list[str]:
         """Return a list of supported formats."""
-        return [AudioFormats.WAV, AudioFormats.MP3]
+        return ["wav", "mp3"]
 
     @property
-    def supported_codecs(self) -> list[AudioCodecs]:
+    def supported_codecs(self) -> list[str]:
         """Return a list of supported codecs."""
-        return [AudioCodecs.PCM, AudioCodecs.MP3]
+        return ["pcm", "mp3"]
 
     @property
-    def supported_bit_rates(self) -> list[AudioBitRates]:
+    def supported_bit_rates(self) -> list[int]:
         """Return a list of supported bitrates."""
-        return [AudioBitRates.BITRATE_16]
+        return [16]
 
     @property
-    def supported_sample_rates(self) -> list[AudioSampleRates]:
+    def supported_sample_rates(self) -> list[int]:
         """Return a list of supported samplerates."""
-        return [AudioSampleRates.SAMPLERATE_16000]
+        return [16000]
 
     @property
-    def supported_channels(self) -> list[AudioChannels]:
+    def supported_channels(self) -> list[int]:
         """Return a list of supported channels."""
-        return [AudioChannels.CHANNEL_MONO]
+        return [1]
 
     async def async_process_audio_stream(
         self, metadata: Any, stream: Any
@@ -82,7 +77,7 @@ class MimoAsrProvider(STTProvider):
 
         try:
             # 根据音频格式确定MIME类型
-            if metadata.format == AudioFormats.WAV:
+            if metadata.format == "wav":
                 mime_type = "audio/wav"
             else:
                 mime_type = "audio/mpeg"
