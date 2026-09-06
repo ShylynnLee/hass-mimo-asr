@@ -6,7 +6,7 @@ import wave
 from collections.abc import AsyncIterable
 from typing import Any
 
-import openai
+import aiohttp
 from homeassistant.components.stt import (
     AudioBitRates,
     AudioChannels,
@@ -19,11 +19,12 @@ from homeassistant.components.stt import (
     SpeechToTextEntity,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
-    CONF_API_KEY,
     CONF_BASE_URL,
     DEFAULT_BASE_URL,
     CONF_LANGUAGE,
@@ -33,6 +34,8 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+TRANSCRIPTION_TIMEOUT = 30  # seconds
 
 
 def encode_wav(data: bytes, channels: int, sample_rate: int) -> bytes:
@@ -57,12 +60,7 @@ async def async_setup_entry(
     language = config_entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
     model = config_entry.data.get(CONF_MODEL, DEFAULT_MODEL)
 
-    client = openai.AsyncOpenAI(
-        api_key=api_key,
-        base_url=base_url,
-    )
-
-    async_add_entities([MimoAsrSpeechToTextEntity(config_entry, client, language, model)])
+    async_add_entities([MimoAsrSpeechToTextEntity(hass, api_key, base_url, language, model)])
 
 
 class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
@@ -70,18 +68,20 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
 
     def __init__(
         self,
-        config_entry: ConfigEntry,
-        client: openai.AsyncOpenAI,
+        hass: HomeAssistant,
+        api_key: str,
+        base_url: str,
         language: str,
         model: str,
     ) -> None:
         """Init MIMO ASR STT entity."""
-        self._attr_unique_id = f"{config_entry.entry_id}"
-        self._attr_name = config_entry.title
-        self._config_entry = config_entry
-        self._client = client
+        self._hass = hass
+        self._api_key = api_key
+        self._base_url = base_url.rstrip('/')
         self._language = language
         self._model = model
+        self._attr_unique_id = f"mimo_asr_{model}"
+        self._attr_name = f"MIMO ASR ({model})"
 
     @property
     def supported_languages(self) -> list[str]:
@@ -127,7 +127,7 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
 
         try:
             # 将原始PCM音频编码为WAV容器
-            wav_data = await self.hass.async_add_executor_job(
+            wav_data = await self._hass.async_add_executor_job(
                 encode_wav,
                 audio_data,
                 int(metadata.channel),
@@ -160,40 +160,56 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
                         ]
                     }
                 ],
-                "extra_body": {
-                    "asr_options": {
-                        "language": self._language
-                    }
+                "asr_options": {
+                    "language": self._language
                 }
             }
             
-            _LOGGER.debug("Sending request to MIMO ASR API: model=%s, language=%s", 
-                         self._model, self._language)
+            # 构建请求URL
+            url = f"{self._base_url}/chat/completions"
             
-            # 调用MIMO ASR API
-            completion = await self._client.chat.completions.create(**request_data)
-
-            # 提取识别结果
-            if completion.choices and completion.choices[0].message:
-                text = completion.choices[0].message.content
-                _LOGGER.debug("MIMO ASR result: %s", text)
-                if text:
-                    return SpeechResult(text, SpeechResultState.SUCCESS)
-                else:
-                    _LOGGER.warning("MIMO ASR returned empty text")
+            # 设置请求头
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self._api_key}"
+            }
+            
+            _LOGGER.debug("Sending request to MIMO ASR API: %s", url)
+            
+            # 发送请求
+            session = async_get_clientsession(self._hass)
+            async with session.post(
+                url,
+                json=request_data,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=TRANSCRIPTION_TIMEOUT),
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    _LOGGER.error("MIMO ASR API error %d: %s", response.status, error_text)
                     return SpeechResult(None, SpeechResultState.ERROR)
-            else:
-                _LOGGER.error("No text in MIMO ASR response: %s", completion)
-                return SpeechResult(None, SpeechResultState.ERROR)
+                
+                result = await response.json()
+                
+                # 提取识别结果
+                if "choices" in result and len(result["choices"]) > 0:
+                    message = result["choices"][0].get("message", {})
+                    text = message.get("content", "")
+                    _LOGGER.debug("MIMO ASR result: %s", text)
+                    if text:
+                        return SpeechResult(text, SpeechResultState.SUCCESS)
+                    else:
+                        _LOGGER.warning("MIMO ASR returned empty text")
+                        return SpeechResult(None, SpeechResultState.ERROR)
+                else:
+                    _LOGGER.error("No text in MIMO ASR response: %s", result)
+                    return SpeechResult(None, SpeechResultState.ERROR)
 
-        except openai.APIError as err:
-            _LOGGER.error("MIMO ASR API error: %s", err)
+        except aiohttp.ClientError as err:
+            _LOGGER.error("MIMO ASR network error: %s", err)
             return SpeechResult(None, SpeechResultState.ERROR)
-        except openai.AuthenticationError as err:
-            _LOGGER.error("MIMO ASR authentication error: %s", err)
-            return SpeechResult(None, SpeechResultState.ERROR)
-        except openai.RateLimitError as err:
-            _LOGGER.error("MIMO ASR rate limit error: %s", err)
+        except asyncio.TimeoutError:
+            _LOGGER.error("MIMO ASR request timed out")
             return SpeechResult(None, SpeechResultState.ERROR)
         except Exception as err:
             _LOGGER.error("MIMO ASR unexpected error: %s", err)

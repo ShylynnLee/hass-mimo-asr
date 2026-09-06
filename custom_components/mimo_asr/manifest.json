@@ -7,6 +7,6 @@
   "config_flow": true,
   "integration_type": "service",
   "iot_class": "cloud_push",
-  "requirements": ["openai>=1.0.0"],
+  "requirements": ["aiohttp"],
   "version": "1.0.0"
 }
