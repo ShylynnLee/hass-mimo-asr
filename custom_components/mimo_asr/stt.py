@@ -1,6 +1,8 @@
 """Support for MIMO ASR speech-to-text."""
 import base64
+import io
 import logging
+import wave
 from collections.abc import AsyncIterable
 from typing import Any
 
@@ -31,6 +33,17 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def encode_wav(data: bytes, channels: int, sample_rate: int) -> bytes:
+    """Wrap raw PCM samples into a WAV container."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(channels)
+        wav_file.setsampwidth(2)  # 16-bit
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(data)
+    return buffer.getvalue()
 
 
 async def async_setup_entry(
@@ -109,21 +122,30 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
             audio_data += chunk
 
         if not audio_data:
+            _LOGGER.error("No audio data received")
             return SpeechResult(None, SpeechResultState.ERROR)
 
         try:
-            # 根据音频格式确定MIME类型
-            if metadata.format == AudioFormats.WAV:
-                mime_type = "audio/wav"
-            else:
-                mime_type = "audio/mpeg"
-
+            # 将原始PCM音频编码为WAV容器
+            wav_data = await self.hass.async_add_executor_job(
+                encode_wav,
+                audio_data,
+                int(metadata.channel),
+                int(metadata.sample_rate),
+            )
+            
             # 转换为Base64
-            audio_base64 = base64.b64encode(audio_data).decode("utf-8")
-            data_url = f"data:{mime_type};base64,{audio_base64}"
+            audio_base64 = base64.b64encode(wav_data).decode("utf-8")
+            data_url = f"data:audio/wav;base64,{audio_base64}"
 
-            # 调用MIMO ASR API（使用流式调用以减少延迟）
-            stream_response = await self._client.chat.completions.create(
+            _LOGGER.debug(
+                "Encoded %.2f MB of audio to WAV, base64 length: %d",
+                len(wav_data) / (1024 * 1024),
+                len(audio_base64),
+            )
+
+            # 调用MIMO ASR API
+            completion = await self._client.chat.completions.create(
                 model=self._model,
                 messages=[
                     {
@@ -143,20 +165,15 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
                         "language": self._language
                     }
                 },
-                stream=True  # 启用流式响应
             )
 
-            # 收集流式响应中的文本
-            text_parts = []
-            async for chunk in stream_response:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    text_parts.append(chunk.choices[0].delta.content)
-            
-            text = "".join(text_parts)
-            
-            if text:
+            # 提取识别结果
+            if completion.choices and completion.choices[0].message:
+                text = completion.choices[0].message.content
+                _LOGGER.debug("MIMO ASR result: %s", text)
                 return SpeechResult(text, SpeechResultState.SUCCESS)
             else:
+                _LOGGER.error("No text in MIMO ASR response")
                 return SpeechResult(None, SpeechResultState.ERROR)
 
         except Exception as err:
