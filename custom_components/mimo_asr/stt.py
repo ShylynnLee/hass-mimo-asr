@@ -144,10 +144,10 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
                 len(audio_base64),
             )
 
-            # 调用MIMO ASR API
-            completion = await self._client.chat.completions.create(
-                model=self._model,
-                messages=[
+            # 准备请求数据
+            request_data = {
+                "model": self._model,
+                "messages": [
                     {
                         "role": "user",
                         "content": [
@@ -160,22 +160,41 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
                         ]
                     }
                 ],
-                extra_body={
+                "extra_body": {
                     "asr_options": {
                         "language": self._language
                     }
-                },
-            )
+                }
+            }
+            
+            _LOGGER.debug("Sending request to MIMO ASR API: model=%s, language=%s", 
+                         self._model, self._language)
+            
+            # 调用MIMO ASR API
+            completion = await self._client.chat.completions.create(**request_data)
 
             # 提取识别结果
             if completion.choices and completion.choices[0].message:
                 text = completion.choices[0].message.content
                 _LOGGER.debug("MIMO ASR result: %s", text)
-                return SpeechResult(text, SpeechResultState.SUCCESS)
+                if text:
+                    return SpeechResult(text, SpeechResultState.SUCCESS)
+                else:
+                    _LOGGER.warning("MIMO ASR returned empty text")
+                    return SpeechResult(None, SpeechResultState.ERROR)
             else:
-                _LOGGER.error("No text in MIMO ASR response")
+                _LOGGER.error("No text in MIMO ASR response: %s", completion)
                 return SpeechResult(None, SpeechResultState.ERROR)
 
+        except openai.APIError as err:
+            _LOGGER.error("MIMO ASR API error: %s", err)
+            return SpeechResult(None, SpeechResultState.ERROR)
+        except openai.AuthenticationError as err:
+            _LOGGER.error("MIMO ASR authentication error: %s", err)
+            return SpeechResult(None, SpeechResultState.ERROR)
+        except openai.RateLimitError as err:
+            _LOGGER.error("MIMO ASR rate limit error: %s", err)
+            return SpeechResult(None, SpeechResultState.ERROR)
         except Exception as err:
-            _LOGGER.error("MIMO ASR error: %s", err)
+            _LOGGER.error("MIMO ASR unexpected error: %s", err)
             return SpeechResult(None, SpeechResultState.ERROR)
