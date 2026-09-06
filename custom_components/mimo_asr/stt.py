@@ -122,8 +122,8 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
             audio_base64 = base64.b64encode(audio_data).decode("utf-8")
             data_url = f"data:{mime_type};base64,{audio_base64}"
 
-            # 调用MIMO ASR API
-            completion = await self._client.chat.completions.create(
+            # 调用MIMO ASR API（使用流式调用以减少延迟）
+            stream_response = await self._client.chat.completions.create(
                 model=self._model,
                 messages=[
                     {
@@ -142,12 +142,19 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
                     "asr_options": {
                         "language": self._language
                     }
-                }
+                },
+                stream=True  # 启用流式响应
             )
 
-            # 提取识别结果
-            if completion.choices and completion.choices[0].message:
-                text = completion.choices[0].message.content
+            # 收集流式响应中的文本
+            text_parts = []
+            async for chunk in stream_response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    text_parts.append(chunk.choices[0].delta.content)
+            
+            text = "".join(text_parts)
+            
+            if text:
                 return SpeechResult(text, SpeechResultState.SUCCESS)
             else:
                 return SpeechResult(None, SpeechResultState.ERROR)
