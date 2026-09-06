@@ -91,12 +91,12 @@ class MimoAsrSpeechToTextEntity(SpeechToTextEntity):
     @property
     def supported_formats(self) -> list[AudioFormats]:
         """Return a list of supported formats."""
-        return [AudioFormats.WAV, AudioFormats.MP3]
+        return [AudioFormats.WAV]
 
     @property
     def supported_codecs(self) -> list[AudioCodecs]:
         """Return a list of supported codecs."""
-        return [AudioCodecs.PCM, AudioCodecs.MP3]
+        return [AudioCodecs.PCM]
 
     @property
     def supported_bit_rates(self) -> list[AudioBitRates]:
