@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MIMO ASR",
+        "description": "设置小米 MIMO ASR 语音识别服务",
+        "data": {
+          "api_key": "API Key",
+          "base_url": "API 端点",
+          "language": "默认语言"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "无法连接到 MIMO ASR 服务",
+      "invalid_auth": "API Key 无效",
+      "unknown": "未知错误"
+    }
+  }
+}

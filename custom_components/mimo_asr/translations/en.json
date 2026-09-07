@@ -2,19 +2,34 @@
   "config": {
     "step": {
       "user": {
-        "title": "MIMO ASR",
-        "description": "Set up Xiaomi MIMO ASR speech recognition service",
+        "title": "设置小米 MIMO ASR",
+        "description": "设置小米 MIMO ASR 语音识别服务\n\n[获取 API Key]({docs_url})",
         "data": {
           "api_key": "API Key",
-          "base_url": "API Endpoint",
-          "language": "Default Language"
+          "base_url": "API 端点",
+          "language": "默认语言",
+          "model": "模型"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect to MIMO ASR service",
-      "invalid_auth": "Invalid API Key",
-      "unknown": "Unknown error"
+      "invalid_auth": "API Key 无效",
+      "cannot_connect": "无法连接到 MIMO ASR 服务"
+    },
+    "abort": {
+      "single_instance_allowed": "只能配置一个 MIMO ASR 实例"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MIMO ASR 选项",
+        "description": "调整语音识别参数",
+        "data": {
+          "silence_seconds": "静音检测秒数",
+          "request_timeout": "请求超时（秒）"
+        }
+      }
     }
   }
 }

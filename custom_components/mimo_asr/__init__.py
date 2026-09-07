@@ -1,23 +1,39 @@
 """The MIMO ASR integration."""
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 
-PLATFORMS = [Platform.SENSOR, Platform.STT]
+_LOGGER = logging.getLogger(__name__)
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+PLATFORMS = [Platform.STT]
+
+
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up MIMO ASR from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = entry.data
+    _LOGGER.info("Setting up MIMO ASR integration for entry: %s", config_entry.entry_id)
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # 将配置条目转发到 STT 平台进行设置
+    await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
+
+    # 将配置数据存入 hass.data 以便其他模块访问（可选）
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][config_entry.entry_id] = config_entry.data
+
+    _LOGGER.info("MIMO ASR integration setup completed successfully.")
     return True
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
 
-    return unload_ok
+async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    _LOGGER.info("Unloading MIMO ASR integration")
+
+    # 清理数据
+    if DOMAIN in hass.data:
+        hass.data[DOMAIN].pop(config_entry.entry_id, None)
+
+    # 卸载平台
+    return await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
